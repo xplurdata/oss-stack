@@ -50,9 +50,11 @@ jobs:
 
       - name: Run Grype scan
         run: |
-          if ! command -v grype &>/dev/null; then
-            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          if ! command -v grype &>/dev/null && [ ! -f "$HOME/bin/grype" ]; then
+            mkdir -p "$HOME/bin"
+            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b "$HOME/bin"
           fi
+          export PATH="$HOME/bin:$PATH"
           grype ${{ matrix.image.full }} --output table
 
   badge:
