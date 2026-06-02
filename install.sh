@@ -470,7 +470,12 @@ echo ""
 wait_healthy "otel-doris-fe"  "Doris Frontend"
 wait_healthy "otel-doris-be"  "Doris Backend"
 wait_healthy "otel-app"       "Application (init + seeding)"
-wait_healthy "otel-collector" "OTel Collector"
+# Collector has no healthcheck — just verify it's running
+if $DOCKER_CMD inspect otel-collector --format="{{.State.Running}}" 2>/dev/null | grep -q true; then
+    echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "OTel Collector")${NC} ${GREEN}running${NC}"
+else
+    warn "OTel Collector may not be running. Check: docker logs otel-collector"
+fi
 
 # ── Write manage.sh ───────────────────────────────────────────
 cat > "$INSTALL_DIR/manage.sh" << 'MANAGE'
