@@ -381,10 +381,10 @@ ${FE_ENV_BLOCK}
       - doris-be
     healthcheck:
       test: ["CMD", "/opt/venv/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/health')"]
-      interval: 30s
-      timeout: 30s
-      start_period: 300s
-      retries: 20
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 40
     restart: unless-stopped
     mem_limit: 1g
     cpus: '0.5'
@@ -525,7 +525,7 @@ echo -e "  ${BOLD}${GREEN}╔═════════════════
 echo -e "  ${BOLD}${GREEN}║                                                       ║${NC}"
 echo -e "  ${BOLD}${GREEN}║   ${WHITE}✓  Installation Complete!${GREEN}                          ║${NC}"
 echo -e "  ${BOLD}${GREEN}║                                                       ║${NC}"
-echo -e "  ${BOLD}${GREEN}║   ${YELLOW}Happy Xploring your data!${GREEN}                         ║${NC}"
+echo -e "  ${BOLD}${GREEN}║   ${YELLOW}Happy Xpluring your data!${GREEN}                         ║${NC}"
 echo -e "  ${BOLD}${GREEN}║                                                       ║${NC}"
 echo -e "  ${BOLD}${GREEN}╚═══════════════════════════════════════════════════════╝${NC}"
 echo ""
