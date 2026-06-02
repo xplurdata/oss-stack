@@ -477,7 +477,7 @@ login_start=$SECONDS
 login_last_elapsed=-1
 while true; do
     login_elapsed=$(( SECONDS - login_start ))
-    if curl -sf -o /dev/null         -X POST "http://localhost/api/auth/login"         -H "Content-Type: application/json"         -d '{"username":"admin","password":"admin"}' 2>/dev/null; then
+    if curl -sf -o /dev/null         -X POST "http://localhost/api/v1/auth/login"         -H "Content-Type: application/json"         -d '{"username":"admin","password":"admin"}' 2>/dev/null; then
         echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${GREEN}ready${NC} ${DIM}(${login_elapsed}s)${NC}"
         break
     fi
