@@ -485,13 +485,41 @@ CMD="${1:-status}"
 DC="docker compose"
 command -v docker &>/dev/null && docker compose version &>/dev/null || DC="docker-compose"
 docker info &>/dev/null || DC="sudo docker compose"
-RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+RED='[0;31m'; GREEN='[0;32m'; CYAN='[0;36m'; YELLOW='[1;33m'; BOLD='[1m'; NC='[0m'
+
+# Map friendly service names to compose service names
+resolve_service() {
+    case "$1" in
+        otel-collector|collector) echo "otel-collector" ;;
+        doris-fe|fe)              echo "doris-fe" ;;
+        doris-be|be)              echo "doris-be" ;;
+        app|*)                    echo "app" ;;
+    esac
+}
+
 case "$CMD" in
-  start)     $DC -f "$INSTALL_DIR/docker-compose.yml" up -d ;;
-  stop)      $DC -f "$INSTALL_DIR/docker-compose.yml" down ;;
-  restart)   $DC -f "$INSTALL_DIR/docker-compose.yml" restart ;;
-  status)    $DC -f "$INSTALL_DIR/docker-compose.yml" ps ;;
-  logs)      $DC -f "$INSTALL_DIR/docker-compose.yml" logs -f ${2:-app} ;;
+  start)
+    echo -e "${CYAN}Starting XD-oss-stack...${NC}"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
+    echo -e "${GREEN}Started successfully${NC}"
+    ;;
+  stop)
+    echo -e "${CYAN}Stopping XD-oss-stack...${NC}"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" stop
+    echo -e "${GREEN}Stopped (containers preserved)${NC}"
+    ;;
+  restart)
+    echo -e "${CYAN}Restarting XD-oss-stack...${NC}"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" restart
+    echo -e "${GREEN}Restarted successfully${NC}"
+    ;;
+  status)
+    $DC -f "$INSTALL_DIR/docker-compose.yml" ps
+    ;;
+  logs)
+    SVC=$(resolve_service "${2:-app}")
+    $DC -f "$INSTALL_DIR/docker-compose.yml" logs -f "$SVC"
+    ;;
   update)
     echo -e "${CYAN}Pulling latest images...${NC}"
     $DC -f "$INSTALL_DIR/docker-compose.yml" up -d --pull always
@@ -505,8 +533,23 @@ case "$CMD" in
     rm -rf "$INSTALL_DIR"
     echo -e "${GREEN}Uninstalled successfully.${NC}"
     ;;
-  *)
-    echo -e "Usage: ${BOLD}$0${NC} {start|stop|restart|status|logs [service]|update|uninstall}"
+  help|*)
+    echo ""
+    echo -e "  ${BOLD}XD-oss-stack — manage.sh${NC}"
+    echo ""
+    echo -e "  ${CYAN}Usage:${NC} $0 <command> [service]"
+    echo ""
+    echo -e "  ${BOLD}Commands:${NC}"
+    echo -e "    ${GREEN}status${NC}              Show container status"
+    echo -e "    ${GREEN}start${NC}               Start all containers"
+    echo -e "    ${GREEN}stop${NC}                Stop all containers (preserves data)"
+    echo -e "    ${GREEN}restart${NC}             Restart all containers"
+    echo -e "    ${GREEN}logs [service]${NC}      Follow logs (default: app)"
+    echo -e "    ${GREEN}update${NC}              Pull latest images and restart"
+    echo -e "    ${GREEN}uninstall${NC}           Remove all containers and data"
+    echo ""
+    echo -e "  ${BOLD}Services:${NC} app, otel-collector, doris-fe, doris-be"
+    echo ""
     ;;
 esac
 MANAGE
