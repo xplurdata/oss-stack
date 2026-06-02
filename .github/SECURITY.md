@@ -12,7 +12,7 @@
 
 If you discover a security vulnerability in XD-oss-stack, please report it responsibly:
 
-**Email:** security@xplurdata.com
+**Email:** bridge@xplurdata.com
 
 Include the following in your report:
 - Description of the vulnerability
