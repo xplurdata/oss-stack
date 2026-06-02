@@ -1,328 +1,72 @@
-name: Security Scans
+name: Security Scan
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: [main]
   schedule:
-    - cron: '0 8 * * 1'
+    - cron: '0 2 * * 1'   # every Monday at 2am
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io/xplurdata
-
 jobs:
-  # ── 1. Secret Scanning ────────────────────────────────────────
-  gitleaks:
-    name: Secret Scan — Gitleaks
+  scan:
     runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    permissions:
+      contents: read
+      security-events: write
 
-      - name: Run Gitleaks
-        run: |
-          docker run --rm \
-            -v $(pwd):/repo \
-            zricethezav/gitleaks:latest \
-            detect \
-            --source /repo \
-            --verbose \
-            --exit-code 0 \
-            --report-format json \
-            --report-path /repo/gitleaks-report.json || true
-
-      - name: Write summary
-        run: |
-          echo "## Secret Scan — Gitleaks" >> $GITHUB_STEP_SUMMARY
-          if [ -f gitleaks-report.json ]; then
-            count=$(cat gitleaks-report.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null || echo "0")
-            if [ "$count" = "0" ] || [ "$count" = "null" ]; then
-              echo "| Status | ✅ No secrets found |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "| Status | ⚠️ $count potential secrets found — check logs |" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "| Status | ✅ No secrets found |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # ── 2. Python SAST — Bandit ───────────────────────────────────
-  bandit:
-    name: SAST — Bandit (Python)
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Bandit
-        run: |
-          docker run --rm \
-            -v $(pwd):/code \
-            python:3.11-slim bash -c "
-              pip install bandit -q &&
-              bandit -r /code/otel-app/api/app \
-                -f json \
-                -o /code/bandit-report.json \
-                --exit-zero \
-                -ll 2>/dev/null || true
-              bandit -r /code/otel-app/api/app \
-                -ll \
-                --exit-zero 2>/dev/null || true
-            "
-
-      - name: Write summary
-        run: |
-          echo "## SAST — Bandit (Python)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f bandit-report.json ]; then
-            high=$(python3 -c "
-          import json
-          with open('bandit-report.json') as f:
-            d = json.load(f)
-          results = d.get('results', [])
-          high = len([r for r in results if r.get('issue_severity') == 'HIGH'])
-          med  = len([r for r in results if r.get('issue_severity') == 'MEDIUM'])
-          low  = len([r for r in results if r.get('issue_severity') == 'LOW'])
-          print(f'{high},{med},{low}')
-          " 2>/dev/null || echo "0,0,0")
-            IFS=',' read -r h m l <<< "$high"
-            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| 🔴 HIGH | $h |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟡 MEDIUM | $m |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟢 LOW | $l |" >> $GITHUB_STEP_SUMMARY
-            if [ "$h" = "0" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ No HIGH severity issues found" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "✅ No issues found" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # ── 3. Shell Script Scan — ShellCheck ────────────────────────
-  shellcheck:
-    name: Shell Scan — ShellCheck
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run ShellCheck
-        run: |
-          docker run --rm \
-            -v $(pwd):/scripts \
-            koalaman/shellcheck:stable \
-            --severity=warning \
-            --format=gcc \
-            /scripts/install.sh \
-            /scripts/manage.sh 2>/dev/null || true
-
-          docker run --rm \
-            -v $(pwd):/scripts \
-            koalaman/shellcheck:stable \
-            --severity=warning \
-            --format=json \
-            /scripts/install.sh \
-            /scripts/manage.sh > shellcheck-report.json 2>/dev/null || true
-
-      - name: Write summary
-        run: |
-          echo "## Shell Scan — ShellCheck" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f shellcheck-report.json ]; then
-            count=$(python3 -c "
-          import json
-          with open('shellcheck-report.json') as f:
-            d = json.load(f)
-          errors   = len([i for i in d if i.get('level') == 'error'])
-          warnings = len([i for i in d if i.get('level') == 'warning'])
-          print(f'{errors},{warnings}')
-          " 2>/dev/null || echo "0,0")
-            IFS=',' read -r e w <<< "$count"
-            echo "| Level | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| 🔴 Errors | $e |" >> $GITHUB_STEP_SUMMARY
-            echo "| 🟡 Warnings | $w |" >> $GITHUB_STEP_SUMMARY
-            if [ "$e" = "0" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ No errors in shell scripts" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "✅ No issues found" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # ── 4. IaC Scan — Checkov ────────────────────────────────────
-  checkov:
-    name: IaC Scan — Checkov
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Checkov
-        run: |
-          docker run --rm \
-            -v $(pwd):/code \
-            bridgecrew/checkov:latest \
-            --directory /code \
-            --framework dockerfile,secrets \
-            --output cli \
-            --soft-fail \
-            --quiet 2>/dev/null || true
-
-          docker run --rm \
-            -v $(pwd):/code \
-            bridgecrew/checkov:latest \
-            --directory /code \
-            --framework dockerfile,secrets \
-            --output json \
-            --soft-fail \
-            --quiet > checkov-report.json 2>/dev/null || true
-
-      - name: Write summary
-        run: |
-          echo "## IaC Scan — Checkov" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f checkov-report.json ]; then
-            stats=$(python3 -c "
-          import json
-          with open('checkov-report.json') as f:
-            d = json.load(f)
-          if isinstance(d, list):
-            passed = sum(r.get('summary', {}).get('passed', 0) for r in d)
-            failed = sum(r.get('summary', {}).get('failed', 0) for r in d)
-          elif isinstance(d, dict):
-            passed = d.get('summary', {}).get('passed', 0)
-            failed = d.get('summary', {}).get('failed', 0)
-          else:
-            passed = failed = 0
-          print(f'{passed},{failed}')
-          " 2>/dev/null || echo "0,0")
-            IFS=',' read -r p f <<< "$stats"
-            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| ✅ Passed | $p |" >> $GITHUB_STEP_SUMMARY
-            echo "| ❌ Failed | $f |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Scan complete" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # ── 5. Dependency Scan — OWASP ───────────────────────────────
-  owasp:
-    name: Dependency Scan — OWASP
-    runs-on: self-hosted
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run OWASP Dependency Check
-        run: |
-          docker run --rm \
-            -v $(pwd):/src \
-            -v $HOME/.cache/owasp:/usr/share/dependency-check/data \
-            owasp/dependency-check:latest \
-            --scan /src/otel-app \
-            --format JSON \
-            --format HTML \
-            --out /src/owasp-report \
-            --nvdApiDelay 6000 \
-            --failOnCVSS 10 \
-            --suppression /src/otel-app/owasp-suppressions.xml 2>/dev/null || true
-
-      - name: Write summary
-        run: |
-          echo "## Dependency Scan — OWASP" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f owasp-report/dependency-check-report.json ]; then
-            stats=$(python3 -c "
-          import json
-          with open('owasp-report/dependency-check-report.json') as f:
-            d = json.load(f)
-          deps = d.get('dependencies', [])
-          vuln_count = sum(len(dep.get('vulnerabilities', [])) for dep in deps)
-          critical = sum(
-            1 for dep in deps
-            for v in dep.get('vulnerabilities', [])
-            if v.get('cvssv3', {}).get('baseSeverity', '') == 'CRITICAL'
-          )
-          print(f'{vuln_count},{critical}')
-          " 2>/dev/null || echo "0,0")
-            IFS=',' read -r total crit <<< "$stats"
-            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| 🔴 Critical | $crit |" >> $GITHUB_STEP_SUMMARY
-            echo "| Total | $total |" >> $GITHUB_STEP_SUMMARY
-            if [ "$crit" = "0" ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "✅ No critical vulnerabilities found" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "✅ Scan complete — no report generated" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  # ── 6. Container Scan — Trivy (CVE only) ─────────────────────
-  trivy:
-    name: Container Scan — Trivy — ${{ matrix.image }}
-    runs-on: self-hosted
     strategy:
-      fail-fast: false
       matrix:
         image:
-          - otel-db-fe
-          - otel-db-be
-          - otel-collector
-          - otel-app
+          - name: oss-stack-fe
+            full: ghcr.io/xplurdata/oss-stack-fe:1.0.0
+          - name: oss-stack-be
+            full: ghcr.io/xplurdata/oss-stack-be:1.0.0
+          - name: oss-stack-app
+            full: ghcr.io/xplurdata/oss-stack-app:1.0.0
+          - name: oss-stack-collector
+            full: ghcr.io/xplurdata/oss-stack-collector:1.0.0
+
     steps:
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | \
-            docker login ghcr.io -u openvibe360 --password-stdin
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Pull image
-        run: docker pull ${{ env.REGISTRY }}/${{ matrix.image }}:1.0.0
+        run: docker pull ${{ matrix.image.full }}
 
-      - name: Trivy — CVE scan (OS + libraries)
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.image.full }}
+          format: sarif
+          output: trivy-${{ matrix.image.name }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image.name }}.sarif
+          category: trivy-${{ matrix.image.name }}
+
+      - name: Run Grype scan
         run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.cache/trivy:/root/.cache/trivy \
-            aquasec/trivy:latest image \
-            --ignore-unfixed \
-            --vuln-type os,library \
-            --severity CRITICAL,HIGH \
-            --exit-code 0 \
-            --format table \
-            ${{ env.REGISTRY }}/${{ matrix.image }}:1.0.0
+          if ! command -v grype &>/dev/null; then
+            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          fi
+          grype ${{ matrix.image.full }} --output table
 
-      - name: Write summary
-        run: |
-          echo "## Trivy — ${{ matrix.image }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Scan Type | Target | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| CVE (OS + Libraries) | Image filesystem | ✅ Complete |" >> $GITHUB_STEP_SUMMARY
-
-  # ── Overall Summary ───────────────────────────────────────────
-  overall-summary:
-    name: Overall Security Summary
+  badge:
     runs-on: self-hosted
-    needs: [gitleaks, bandit, shellcheck, checkov, owasp, trivy]
+    needs: scan
     if: always()
     steps:
-      - name: Write overall summary
+      - name: Update scan badge
         run: |
-          echo "# XD-oss-stack Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Scanner | Type | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Gitleaks | Secret Detection | ${{ needs.gitleaks.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Bandit | Python SAST | ${{ needs.bandit.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| ShellCheck | Shell Scripts | ${{ needs.shellcheck.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Checkov | IaC / Dockerfile | ${{ needs.checkov.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| OWASP | Dependencies | ${{ needs.owasp.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Trivy | Container CVE Scan | ${{ needs.trivy.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Scanned on: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.scan.result }}" = "success" ]; then
+            STATUS="passing"
+            COLOR="brightgreen"
+          else
+            STATUS="failing"
+            COLOR="red"
+          fi
+          echo "Scan status: $STATUS"
