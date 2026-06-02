@@ -400,11 +400,7 @@ ${FE_ENV_BLOCK}
     depends_on:
       - app
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:13133/ || exit 1"]
-      interval: 15s
-      timeout: 10s
-      start_period: 30s
-      retries: 5
+      disable: true
     restart: unless-stopped
     mem_limit: 1500m
     cpus: '0.5'
