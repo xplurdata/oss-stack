@@ -54,4 +54,3 @@ steps:
     with:
       sarif_file: trivy-results.sarif
       category: ${{ matrix.image.name }}
-```
