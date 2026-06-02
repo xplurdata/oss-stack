@@ -470,6 +470,32 @@ echo ""
 wait_healthy "otel-doris-fe"  "Doris Frontend"
 wait_healthy "otel-doris-be"  "Doris Backend"
 wait_healthy "otel-app"       "Application (init + seeding)"
+
+# Wait for login endpoint — confirms seeding complete and app fully ready
+echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}waiting...${NC}"
+login_start=$SECONDS
+while true; do
+    login_elapsed=$(( SECONDS - login_start ))
+    if $DOCKER_CMD exec otel-app /opt/venv/bin/python3 -c "
+import urllib.request, json
+req = urllib.request.Request(
+    'http://localhost/api/auth/login',
+    data=json.dumps({'username':'admin','password':'admin'}).encode(),
+    headers={'Content-Type':'application/json'},
+    method='POST'
+)
+resp = urllib.request.urlopen(req, timeout=5)
+assert resp.status == 200
+" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${GREEN}ready${NC} ${DIM}(${login_elapsed}s)${NC}"
+        break
+    fi
+    if [ $(( login_elapsed % 15 )) -eq 0 ] && [ "$login_elapsed" -gt 0 ]; then
+        echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}${login_elapsed}s elapsed...${NC}"
+    fi
+    sleep 3
+done
+
 # Collector has no healthcheck — just verify it's running
 if $DOCKER_CMD inspect otel-collector --format="{{.State.Running}}" 2>/dev/null | grep -q true; then
     echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "OTel Collector")${NC} ${GREEN}running${NC}"
