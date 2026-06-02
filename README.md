@@ -150,9 +150,10 @@ After install (~3-5 minutes on first boot):
 
 ```bash
 docker run --rm \
+ --network xd-oss-stack_otel-net \
   ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
   logs \
-  --otlp-endpoint <your-ip>:4318 \
+  --otlp-endpoint otel-collector:4318 \
   --otlp-http \
   --otlp-insecure \
   --duration 10s \
