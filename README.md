@@ -12,7 +12,10 @@
   <img src="https://img.shields.io/badge/Docker-required-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Apache%20Doris-4.0.4-1C64F2?style=flat-square" alt="Apache Doris">
   <img src="https://img.shields.io/badge/OTel%20Collector-0.149.0-6e4aff?style=flat-square" alt="OTel Collector">
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey?style=flat-square" alt="Platform">
+  <a href="https://github.com/xplurdata/oss-stack/actions/workflows/security-scan.yml">
+    <img src="https://github.com/xplurdata/oss-stack/actions/workflows/security-scan.yml/badge.svg" alt="Security Scan">
+  </a>
 </p>
 
 <br/>
@@ -56,7 +59,7 @@ flowchart LR
             BE["Doris BE\nColumnar storage · :8040"]
             FE <-->|internal| BE
         end
-        APP["XD-API + React UI\nREST · Full-text search · :80"]
+        APP["XD-APP + XD-API\n:80"]
         COL -->|Stream Load| FE
         FE -->|SQL| APP
     end
@@ -71,8 +74,9 @@ flowchart LR
     GEN  -->|OTLP/HTTP :4318| COL
     HTTP -->|OTLP/HTTP :4318| COL
 
-    APP --> DB1
-    APP --> DB2
+    BE --> DB1
+    BE --> DB2
+    FE -->|Query| UI
     APP --> UI
 ```
 
@@ -85,6 +89,20 @@ flowchart LR
 
 ---
 
+## System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|:-------:|:-----------:|
+| CPU | 2 cores | 4+ cores |
+| RAM | 4 GB | 8 GB |
+| Disk | 20 GB | 100 GB |
+| Docker | 20.10+ | latest |
+| OS | Ubuntu 20.04+ / macOS 12+ | Ubuntu 22.04 |
+
+> **Low RAM?** The installer automatically detects available memory and applies reduced JVM settings for machines with less than 8 GB RAM.
+
+---
+
 ## Quick Install
 
 ### Prerequisites
@@ -93,9 +111,8 @@ flowchart LR
 |----|-------------|
 | Linux | Nothing — Docker auto-installed if missing |
 | macOS | Docker Desktop running |
-| Windows | Docker Desktop + WSL2 running |
 
-### Linux / macOS
+### Install
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh)"
@@ -122,12 +139,13 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
   ▶  Waiting for services
   ✓  Doris Frontend         healthy (67s)
   ✓  Doris Backend          healthy (102s)
-  ✓  Application            healthy (198s)
-  ✓  OTel Collector         healthy (201s)
+  ✓  Application            healthy (142s)
+  ✓  Login endpoint         ready (198s)
+  ✓  OTel Collector         running
 
   ╔═══════════════════════════════════════════════════════╗
   ║   ✓  Installation Complete!                          ║
-  ║      Happy Xploring your data!                       ║
+  ║      Happy Xpluring your data!                       ║
   ╚═══════════════════════════════════════════════════════╝
 ```
 
@@ -150,7 +168,7 @@ After install (~3-5 minutes on first boot):
 
 ```bash
 docker run --rm \
- --network xd-oss-stack_otel-net \
+  --network xd-oss-stack_otel-net \
   ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
   logs \
   --otlp-endpoint otel-collector:4318 \
@@ -161,10 +179,13 @@ docker run --rm \
   --service my-service
 ```
 
-### OpenTelemetry Python SDK
+### Send logs from your application
+
+<details>
+<summary><b>Python</b></summary>
 
 ```bash
-pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
 ```
 
 ```python
@@ -175,26 +196,200 @@ from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.resources import Resource
 
-resource = Resource.create({"service.name": "my-service", "service.version": "1.0.0"})
-lp = LoggerProvider(resource=resource)
-lp.add_log_record_processor(
+resource = Resource.create({"service.name": "my-service"})
+provider = LoggerProvider(resource=resource)
+provider.add_log_record_processor(
     BatchLogRecordProcessor(
-        OTLPLogExporter(endpoint="http://<your-ip>:4318/v1/logs")
+        OTLPLogExporter(endpoint="http://<YOUR_HOST>:4318/v1/logs")
     )
 )
-set_logger_provider(lp)
+set_logger_provider(provider)
 
 logger = logging.getLogger("my-service")
-logger.addHandler(LoggingHandler(logger_provider=lp))
+logger.addHandler(LoggingHandler(logger_provider=provider))
 logger.setLevel(logging.INFO)
 logger.info("Hello from my-service!")
 ```
+</details>
 
-### Any OTel SDK
+<details>
+<summary><b>Node.js</b></summary>
 
-Point your OTLP exporter to `http://<your-ip>:4318`
+```bash
+npm install @opentelemetry/sdk-logs @opentelemetry/exporter-logs-otlp-http @opentelemetry/sdk-node
+```
 
-Supported: Go, Java, Node.js, .NET, Python, Ruby, PHP, Rust and more.
+```javascript
+const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
+
+const provider = new LoggerProvider();
+provider.addLogRecordProcessor(
+  new BatchLogRecordProcessor(
+    new OTLPLogExporter({ url: 'http://<YOUR_HOST>:4318/v1/logs' })
+  )
+);
+
+const logger = provider.getLogger('my-service');
+logger.emit({ severityText: 'INFO', body: 'Hello from my-service!' });
+```
+</details>
+
+<details>
+<summary><b>Java</b></summary>
+
+```bash
+# Download OpenTelemetry Java Agent
+wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+# Run your app with auto-instrumentation
+java \
+  -javaagent:opentelemetry-javaagent.jar \
+  -Dotel.service.name=my-service \
+  -Dotel.logs.exporter=otlp \
+  -Dotel.exporter.otlp.endpoint=http://<YOUR_HOST>:4318 \
+  -jar app.jar
+```
+
+```java
+// Or manual SDK
+import io.opentelemetry.api.logs.Logger;
+// point exporter to http://<YOUR_HOST>:4318/v1/logs
+logger.logRecordBuilder()
+      .setBody("Hello from my-service!")
+      .setSeverity(Severity.INFO)
+      .emit();
+```
+</details>
+
+<details>
+<summary><b>Go</b></summary>
+
+```bash
+go get go.opentelemetry.io/otel
+go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp
+```
+
+```go
+package main
+
+import (
+    "context"
+    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+    "go.opentelemetry.io/otel/log/global"
+    sdklog "go.opentelemetry.io/otel/sdk/log"
+)
+
+func main() {
+    exporter, _ := otlploghttp.New(context.Background(),
+        otlploghttp.WithEndpoint("<YOUR_HOST>:4318"),
+        otlploghttp.WithInsecure(),
+    )
+    provider := sdklog.NewLoggerProvider(
+        sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter)),
+    )
+    global.SetLoggerProvider(provider)
+}
+```
+</details>
+
+<details>
+<summary><b>.NET</b></summary>
+
+```bash
+dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+dotnet add package OpenTelemetry.Extensions.Hosting
+```
+
+```csharp
+using OpenTelemetry.Logs;
+
+builder.Logging.AddOpenTelemetry(options => {
+    options.AddOtlpExporter(otlp => {
+        otlp.Endpoint = new Uri("http://<YOUR_HOST>:4318/v1/logs");
+    });
+});
+
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("Hello from my-service!");
+```
+</details>
+
+<details>
+<summary><b>Ruby</b></summary>
+
+```bash
+gem install opentelemetry-sdk opentelemetry-exporter-otlp
+```
+
+```ruby
+require 'opentelemetry-sdk'
+require 'opentelemetry-exporter-otlp'
+
+OpenTelemetry::SDK.configure do |c|
+  c.service_name = 'my-service'
+  c.add_span_processor(
+    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+      OpenTelemetry::Exporter::OTLP::Exporter.new(
+        endpoint: 'http://<YOUR_HOST>:4318/v1/logs'
+      )
+    )
+  )
+end
+```
+</details>
+
+<details>
+<summary><b>PHP</b></summary>
+
+```bash
+composer require open-telemetry/sdk open-telemetry/exporter-otlp
+```
+
+```php
+<?php
+use OpenTelemetry\SDK\Logs\LoggerProvider;
+use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
+use OpenTelemetry\Contrib\Otlp\LogsExporter;
+
+$transport = (new OtlpHttpTransportFactory())->create(
+    'http://<YOUR_HOST>:4318/v1/logs', 'application/x-protobuf'
+);
+$exporter = new LogsExporter($transport);
+$provider = LoggerProvider::builder()
+    ->addLogRecordProcessor(new SimpleLogRecordProcessor($exporter))
+    ->build();
+
+$logger = $provider->getLogger('my-service');
+$logger->logRecord()->setBody('Hello from my-service!')->emit();
+```
+</details>
+
+<details>
+<summary><b>Rust</b></summary>
+
+```toml
+# Cargo.toml
+[dependencies]
+opentelemetry = "0.22"
+opentelemetry-otlp = { version = "0.15", features = ["logs"] }
+opentelemetry_sdk = { version = "0.22", features = ["logs"] }
+```
+
+```rust
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::logs::LoggerProvider;
+
+let exporter = opentelemetry_otlp::new_exporter()
+    .http()
+    .with_endpoint("http://<YOUR_HOST>:4318/v1/logs");
+
+let provider = LoggerProvider::builder()
+    .with_batch_exporter(exporter.build_log_exporter().unwrap(),
+        opentelemetry_sdk::runtime::Tokio)
+    .build();
+```
+</details>
 
 ---
 
@@ -204,27 +399,16 @@ Supported: Go, Java, Node.js, .NET, Python, Ruby, PHP, Rust and more.
 ~/xd-oss-stack/manage.sh status       # container status
 ~/xd-oss-stack/manage.sh logs         # follow app logs
 ~/xd-oss-stack/manage.sh logs otel-collector
+~/xd-oss-stack/manage.sh logs doris-fe
+~/xd-oss-stack/manage.sh logs doris-be
 ~/xd-oss-stack/manage.sh update       # pull latest images
 ~/xd-oss-stack/manage.sh restart      # restart all containers
-~/xd-oss-stack/manage.sh stop         # stop all containers
+~/xd-oss-stack/manage.sh stop         # stop all containers (preserves data)
 ~/xd-oss-stack/manage.sh uninstall    # remove everything
 ```
 
 ---
 
-## System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|:-------:|:-----------:|
-| CPU | 2 cores | 4+ cores |
-| RAM | 4 GB | 8 GB |
-| Disk | 20 GB | 100 GB |
-| Docker | 20.10+ | latest |
-| OS | Ubuntu 20.04+ / macOS 12+ / Win 10+ | Ubuntu 22.04 |
-
-> **Low RAM?** No problem. The installer automatically detects available memory and applies reduced JVM settings for machines with less than 8 GB RAM.
-
----
 
 ## Demo Data
 
@@ -243,7 +427,22 @@ On first boot the stack seeds **10,000 realistic log records** across 5 microser
 ## Troubleshooting
 
 <details>
-<summary>Stack not starting</summary>
+<summary><b>Install stopped midway — how to clean up and retry</b></summary>
+
+If the installer stops after "Writing configuration" for any reason, clean up before retrying:
+
+```bash
+docker compose -f ~/xd-oss-stack/docker-compose.yml down -v 2>/dev/null || true
+sudo rm -rf /var/lib/xd-oss-stack
+docker network prune -f
+
+# Then re-run the installer
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh)"
+```
+</details>
+
+<details>
+<summary><b>Stack not starting</b></summary>
 
 ```bash
 docker logs otel-doris-fe
@@ -252,7 +451,7 @@ docker logs otel-doris-be
 </details>
 
 <details>
-<summary>Doris FE fails with "insufficient memory"</summary>
+<summary><b>Doris FE fails with "insufficient memory"</b></summary>
 
 Your machine has less than 8 GB RAM. The installer automatically applies reduced JVM settings. If it still fails:
 
@@ -264,7 +463,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 </details>
 
 <details>
-<summary>No data in otel_db.otel_logs</summary>
+<summary><b>No data in otel_db.otel_logs</b></summary>
 
 ```bash
 docker logs otel-collector
@@ -272,7 +471,7 @@ docker logs otel-collector
 </details>
 
 <details>
-<summary>App not ready after 5 minutes</summary>
+<summary><b>App not ready after 5 minutes</b></summary>
 
 ```bash
 docker logs -f otel-app
@@ -280,7 +479,7 @@ docker logs -f otel-app
 </details>
 
 <details>
-<summary>Port 80 or 4318 already in use</summary>
+<summary><b>Port 80 or 4318 already in use</b></summary>
 
 ```bash
 sudo lsof -i :80
@@ -289,7 +488,7 @@ sudo lsof -i :4318
 </details>
 
 <details>
-<summary>macOS: process.lock AccessDeniedException</summary>
+<summary><b>macOS: process.lock AccessDeniedException</b></summary>
 
 The installer uses `~/.xd-oss-stack/data` on macOS to avoid bind mount permission issues. If it still fails:
 
@@ -300,11 +499,11 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 </details>
 
 <details>
-<summary>Full reset (wipes all data)</summary>
+<summary><b>Full reset (wipes all data)</b></summary>
 
 ```bash
 ~/xd-oss-stack/manage.sh uninstall
-# Then re-run the installer
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh)"
 ```
 </details>
 
@@ -323,9 +522,9 @@ This project is licensed under the **[GNU Affero General Public License v3.0 (AG
 
 <div align="center">
 
-**Built by [Xplurdata](https://github.com/xplurdata) · Explore your data**
+**Built by [Xplurdata](https://github.com/xplurdata) · Happy Xpluring your data!**
 
-[Apache Doris](https://doris.apache.org/) &nbsp;·&nbsp; [OpenTelemetry](https://opentelemetry.io/) &nbsp;·&nbsp; [React](https://react.dev/)
+[Apache Doris](https://doris.apache.org/) &nbsp;·&nbsp; [OpenTelemetry](https://opentelemetry.io/) &nbsp;·&nbsp; [xplurdata.com](https://www.xplurdata.com)
 
 <br/>
 
