@@ -316,7 +316,6 @@ volumes:
 services:
   doris-fe:
     image: ${REGISTRY}/oss-stack-fe:1.0.0
-    platform: linux/amd64
     container_name: otel-doris-fe
     networks:
       otel-net:
@@ -341,7 +340,6 @@ ${FE_ENV_BLOCK}
 
   doris-be:
     image: ${REGISTRY}/oss-stack-be:1.0.0
-    platform: linux/amd64
     container_name: otel-doris-be
     networks:
       otel-net:
@@ -371,7 +369,6 @@ ${FE_ENV_BLOCK}
 
   app:
     image: ${REGISTRY}/oss-stack-app:1.0.0
-    platform: linux/amd64
     container_name: otel-app
     networks:
       otel-net:
@@ -383,7 +380,7 @@ ${FE_ENV_BLOCK}
     depends_on:
       - doris-be
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost/health || exit 1"]
+      test: ["CMD-SHELL", "/opt/venv/bin/python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/health')\" 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 30s
       start_period: 300s
@@ -394,7 +391,6 @@ ${FE_ENV_BLOCK}
 
   otel-collector:
     image: ${REGISTRY}/oss-stack-collector:1.0.0
-    platform: linux/amd64
     container_name: otel-collector
     networks:
       otel-net:
