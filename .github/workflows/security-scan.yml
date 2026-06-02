@@ -1,72 +1,72 @@
 name: Security Scan
 
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '0 2 * * 1'   # every Monday at 2am
-  workflow_dispatch:
+push:
+branches:
+- main
+workflow_dispatch:
+schedule:
+- cron: '0 2 * * 1'
 
 jobs:
-  scan:
-    runs-on: self-hosted
-    permissions:
-      contents: read
-      security-events: write
+scan:
+runs-on: self-hosted
 
-    strategy:
-      matrix:
-        image:
-          - name: oss-stack-fe
-            full: ghcr.io/xplurdata/oss-stack-fe:1.0.0
-          - name: oss-stack-be
-            full: ghcr.io/xplurdata/oss-stack-be:1.0.0
-          - name: oss-stack-app
-            full: ghcr.io/xplurdata/oss-stack-app:1.0.0
-          - name: oss-stack-collector
-            full: ghcr.io/xplurdata/oss-stack-collector:1.0.0
+```
+permissions:
+  contents: read
+  security-events: write
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+strategy:
+  fail-fast: false
+  matrix:
+    image:
+      - name: oss-stack-fe
+        full: ghcr.io/xplurdata/oss-stack-fe:1.0.0
+      - name: oss-stack-be
+        full: ghcr.io/xplurdata/oss-stack-be:1.0.0
+      - name: oss-stack-app
+        full: ghcr.io/xplurdata/oss-stack-app:1.0.0
+      - name: oss-stack-collector
+        full: ghcr.io/xplurdata/oss-stack-collector:1.0.0
 
-      - name: Pull image
-        run: docker pull ${{ matrix.image.full }}
+steps:
+  - uses: actions/checkout@v4
 
-      - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ matrix.image.full }}
-          format: sarif
-          output: trivy-${{ matrix.image.name }}.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+  - name: Pull image
+    run: docker pull ${{ matrix.image.full }}
 
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-${{ matrix.image.name }}.sarif
-          category: trivy-${{ matrix.image.name }}
+  - name: Run Trivy scan
+    uses: aquasecurity/trivy-action@0.28.0
+    with:
+      image-ref: ${{ matrix.image.full }}
+      format: sarif
+      output: trivy-${{ matrix.image.name }}.sarif
+      severity: CRITICAL,HIGH
+      exit-code: 0
 
-      - name: Run Grype scan
-        run: |
-          if ! command -v grype &>/dev/null; then
-            curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          fi
-          grype ${{ matrix.image.full }} --output table
+  - name: Upload Trivy SARIF
+    uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: trivy-${{ matrix.image.name }}.sarif
+      category: trivy-${{ matrix.image.name }}
 
-  badge:
-    runs-on: self-hosted
-    needs: scan
-    if: always()
-    steps:
-      - name: Update scan badge
-        run: |
-          if [ "${{ needs.scan.result }}" = "success" ]; then
-            STATUS="passing"
-            COLOR="brightgreen"
-          else
-            STATUS="failing"
-            COLOR="red"
-          fi
-          echo "Scan status: $STATUS"
+  - name: Run Grype scan
+    uses: anchore/scan-action@v6
+    with:
+      image: ${{ matrix.image.full }}
+      fail-build: false
+      severity-cutoff: high
+```
+
+badge:
+runs-on: self-hosted
+needs: scan
+if: always()
+
+```
+steps:
+  - name: Report status
+    run: |
+      echo "Scan result: ${{ needs.scan.result }}"
+```
