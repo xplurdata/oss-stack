@@ -476,22 +476,29 @@ echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM
 login_start=$SECONDS
 while true; do
     login_elapsed=$(( SECONDS - login_start ))
-    if $DOCKER_CMD exec otel-app /opt/venv/bin/python3 -c "
-import urllib.request, json
-req = urllib.request.Request(
-    'http://localhost/api/auth/login',
-    data=json.dumps({'username':'admin','password':'admin'}).encode(),
-    headers={'Content-Type':'application/json'},
-    method='POST'
-)
-resp = urllib.request.urlopen(req, timeout=5)
-assert resp.status == 200
-" 2>/dev/null; then
+    # Use python to POST login — exit 0 only on HTTP 200
+    HTTP_STATUS=$($DOCKER_CMD exec otel-app /opt/venv/bin/python3 -c "
+import urllib.request, urllib.error, json, sys
+try:
+    req = urllib.request.Request(
+        'http://localhost/api/auth/login',
+        data=json.dumps({'username':'admin','password':'admin'}).encode(),
+        headers={'Content-Type':'application/json'},
+        method='POST'
+    )
+    resp = urllib.request.urlopen(req, timeout=5)
+    print(resp.status)
+except urllib.error.HTTPError as e:
+    print(e.code)
+except Exception:
+    print(0)
+" 2>/dev/null || echo 0)
+    if [ "$HTTP_STATUS" = "200" ]; then
         echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${GREEN}ready${NC} ${DIM}(${login_elapsed}s)${NC}"
         break
     fi
     if [ $(( login_elapsed % 15 )) -eq 0 ] && [ "$login_elapsed" -gt 0 ]; then
-        echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}${login_elapsed}s elapsed...${NC}"
+        echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}${login_elapsed}s elapsed... (status: ${HTTP_STATUS})${NC}"
     fi
     sleep 3
 done
