@@ -380,7 +380,7 @@ ${FE_ENV_BLOCK}
     depends_on:
       - doris-be
     healthcheck:
-      test: ["CMD-SHELL", "/opt/venv/bin/python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost/health')\" 2>/dev/null || exit 1"]
+      test: ["CMD", "/opt/venv/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/health')"]
       interval: 30s
       timeout: 30s
       start_period: 300s
