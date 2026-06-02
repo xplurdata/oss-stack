@@ -498,7 +498,7 @@ except Exception:
         break
     fi
     if [ $(( login_elapsed % 15 )) -eq 0 ] && [ "$login_elapsed" -gt 0 ]; then
-        echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}${login_elapsed}s elapsed... (status: ${HTTP_STATUS})${NC}"
+        echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Login endpoint")${NC} ${DIM}${login_elapsed}s elapsed...${NC}"
     fi
     sleep 3
 done
