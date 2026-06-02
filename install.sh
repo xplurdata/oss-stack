@@ -192,16 +192,24 @@ elif [ "$TOTAL_RAM_GB" -lt 8 ]; then
     warn "RAM: ${TOTAL_RAM_GB} GB — 8 GB recommended. Reduced JVM settings will be applied."
 fi
 
-if [ "$FREE_RAM_GB" -lt 4 ] || [ "$TOTAL_RAM_GB" -lt 8 ]; then
+# Set JVM based on available RAM — minimum floor is always 1g/512m
+if [ "$TOTAL_RAM_GB" -ge 8 ] && [ "$FREE_RAM_GB" -ge 4 ]; then
+    FE_JVM_OPTS=""
+    BE_MEM_LIMIT="3500m"
+    FE_MEM_LIMIT="4g"
+    success "Memory OK — using default JVM settings (FE: 2GB heap)"
+elif [ "$TOTAL_RAM_GB" -ge 6 ] || [ "$FREE_RAM_GB" -ge 3 ]; then
     FE_JVM_OPTS="-Xmx1g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.net.preferIPv4Stack=true"
     BE_MEM_LIMIT="2g"
     FE_MEM_LIMIT="2g"
     warn "Low memory detected — applying reduced JVM settings (FE: 1GB heap)"
 else
-    FE_JVM_OPTS=""
-    BE_MEM_LIMIT="3500m"
-    FE_MEM_LIMIT="4g"
-    success "Memory OK — using default JVM settings"
+    # Absolute minimum — Doris needs at least 1g to start
+    FE_JVM_OPTS="-Xmx1g -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djava.net.preferIPv4Stack=true"
+    BE_MEM_LIMIT="1500m"
+    FE_MEM_LIMIT="1500m"
+    warn "Very low memory — applying minimum JVM settings (FE: 1GB heap)"
+    warn "Performance may be degraded. Closing other applications is recommended."
 fi
 
 FREE_DISK_GB=$(( $(df -k "$HOME" | tail -1 | awk '{print $4}') / 1048576 ))
@@ -308,6 +316,7 @@ volumes:
 services:
   doris-fe:
     image: ${REGISTRY}/oss-stack-fe:1.0.0
+    platform: linux/amd64
     container_name: otel-doris-fe
     networks:
       otel-net:
@@ -332,6 +341,7 @@ ${FE_ENV_BLOCK}
 
   doris-be:
     image: ${REGISTRY}/oss-stack-be:1.0.0
+    platform: linux/amd64
     container_name: otel-doris-be
     networks:
       otel-net:
@@ -361,6 +371,7 @@ ${FE_ENV_BLOCK}
 
   app:
     image: ${REGISTRY}/oss-stack-app:1.0.0
+    platform: linux/amd64
     container_name: otel-app
     networks:
       otel-net:
@@ -383,6 +394,7 @@ ${FE_ENV_BLOCK}
 
   otel-collector:
     image: ${REGISTRY}/oss-stack-collector:1.0.0
+    platform: linux/amd64
     container_name: otel-collector
     networks:
       otel-net:
