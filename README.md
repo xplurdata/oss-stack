@@ -509,6 +509,16 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 ---
 
+## Community
+
+| | |
+|---|---|
+| 💼 **LinkedIn** | [xplurdata](https://www.linkedin.com/company/xplurdata) |
+| 💬 **Slack** | [Join our Slack](https://xplurdata.slack.com) |
+| 🌐 **Website** | [xplurdata.com](https://www.xplurdata.com) |
+
+---
+
 ## License
 
 This project is licensed under the **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)**.
