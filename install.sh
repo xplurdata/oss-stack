@@ -544,11 +544,25 @@ case "$CMD" in
     echo -e "${GREEN}Updated successfully${NC}"
     ;;
   uninstall)
-    echo -e "${RED}This will remove all containers and data. Are you sure? [y/N]${NC} "
+    echo -e "${RED}This will remove all containers, volumes and the install directory.${NC}"
+    echo -ne "${RED}Are you sure? [y/N]${NC} "
     read -r resp
     [[ "$resp" =~ ^[Yy]$ ]] || exit 0
-    $DC -f "$INSTALL_DIR/docker-compose.yml" down -v
+    echo -e "${CYAN}Stopping and removing containers...${NC}"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" down -v 2>/dev/null || true
+    echo -e "${CYAN}Removing install directory...${NC}"
     rm -rf "$INSTALL_DIR"
+    echo ""
+    echo -ne "${RED}Also remove Doris data directory? This deletes ALL stored data permanently. [y/N]${NC} "
+    read -r data_resp
+    if [[ "$data_resp" =~ ^[Yy]$ ]]; then
+        DATA_DIR="/var/lib/xd-oss-stack"
+        [ -d "$HOME/.xd-oss-stack" ] && DATA_DIR="$HOME/.xd-oss-stack"
+        sudo rm -rf "$DATA_DIR" 2>/dev/null || rm -rf "$DATA_DIR" 2>/dev/null || true
+        echo -e "${GREEN}Data directory removed.${NC}"
+    else
+        echo -e "${YELLOW}Data directory kept — you can remove it manually later.${NC}"
+    fi
     echo -e "${GREEN}Uninstalled successfully.${NC}"
     ;;
   help|*)
@@ -596,11 +610,13 @@ echo -e "  ${CYAN}│${NC}  Login     -> ${BOLD}admin${NC} / ${BOLD}admin${NC}"
 echo -e "  ${CYAN}│${NC}  OTLP HTTP -> ${BOLD}${CYAN}http://${HOST_IP}:4318${NC}"
 echo ""
 echo -e "  ${BOLD}${WHITE}Manage:${NC}"
-echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}status${NC}"
-echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}logs${NC}"
-echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}update${NC}"
-echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}stop${NC}"
-echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}uninstall${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}status${NC}             ${DIM}# container status${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}start${NC}              ${DIM}# start all containers${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}stop${NC}               ${DIM}# stop all containers${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}restart${NC}            ${DIM}# restart all containers${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}logs${NC} ${DIM}[service]${NC}     ${DIM}# follow logs${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}update${NC}             ${DIM}# pull latest images${NC}"
+echo -e "  ${CYAN}│${NC}  ${CYAN}$INSTALL_DIR/manage.sh${NC} ${BOLD}uninstall${NC}          ${DIM}# remove everything${NC}"
 echo ""
 echo -e "  ${BOLD}${GREEN}─────────────────────────────────────────────────────${NC}"
 echo ""
