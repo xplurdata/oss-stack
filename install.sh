@@ -224,6 +224,7 @@ fi
 
 check_port() {
     local port="$1"
+    local required="$2"
     local in_use=false
     if command -v ss &>/dev/null && ss -tlnH 2>/dev/null | grep -q ":${port} "; then
         in_use=true
@@ -232,12 +233,20 @@ check_port() {
     fi
     if $in_use; then
         warn "Port ${port} is already in use"
+        if [ "$required" = "true" ]; then
+            info "Port ${port} is required. Find what is using it:"
+            info "  sudo lsof -i :${port}"
+            info "Stop the conflicting process then re-run the installer."
+            echo -ne "  ${CYAN}?${NC}  Continue anyway? [y/N] "
+            read -r port_resp < /dev/tty
+            [[ "$port_resp" =~ ^[Yy]$ ]] || error "Aborted — port ${port} is in use."
+        fi
     else
         success "Port ${port}: available"
     fi
 }
-check_port 80
-check_port 4318
+check_port 80   true
+check_port 4318 true
 
 # ── Configuration ─────────────────────────────────────────────
 step "Configuration"
