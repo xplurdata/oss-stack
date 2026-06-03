@@ -512,9 +512,8 @@ CMD="${1:-status}"
 DC="docker compose"
 command -v docker &>/dev/null && docker compose version &>/dev/null || DC="docker-compose"
 docker info &>/dev/null || DC="sudo docker compose"
-RED='[0;31m'; GREEN='[0;32m'; CYAN='[0;36m'; YELLOW='[1;33m'; BOLD='[1m'; NC='[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
-# Map friendly service names to compose service names
 resolve_service() {
     case "$1" in
         otel-collector|collector) echo "otel-collector" ;;
@@ -524,20 +523,58 @@ resolve_service() {
     esac
 }
 
+wait_healthy() {
+    local container="$1"
+    local label="$2"
+    local start=$SECONDS
+    local last_elapsed=-1
+    echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "$label")${NC} ${DIM}waiting...${NC}"
+    while true; do
+        local elapsed=$(( SECONDS - start ))
+        local status
+        status=$(docker inspect "$container" --format="{{.State.Health.Status}}" 2>/dev/null || echo "starting")
+        if [ "$status" = "healthy" ]; then
+            echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "$label")${NC} ${GREEN}healthy${NC} ${DIM}(${elapsed}s)${NC}"
+            break
+        fi
+        if [ $(( elapsed % 15 )) -eq 0 ] && [ "$elapsed" -ne "$last_elapsed" ] && [ "$elapsed" -gt 0 ]; then
+            echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "$label")${NC} ${DIM}${elapsed}s elapsed...${NC}"
+            last_elapsed=$elapsed
+        fi
+        sleep 3
+    done
+}
+
+start_stack() {
+    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d doris-fe
+    wait_healthy "otel-doris-fe" "Doris Frontend"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
+    wait_healthy "otel-doris-be" "Doris Backend"
+    wait_healthy "otel-app"      "Application"
+    if docker inspect otel-collector --format="{{.State.Running}}" 2>/dev/null | grep -q true; then
+        echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "OTel Collector")${NC} ${GREEN}running${NC}"
+    fi
+}
+
 case "$CMD" in
   start)
     echo -e "${CYAN}Starting XD-oss-stack...${NC}"
-    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
+    echo ""
+    start_stack
+    echo ""
     echo -e "${GREEN}Started successfully${NC}"
     ;;
   stop)
     echo -e "${CYAN}Stopping XD-oss-stack...${NC}"
     $DC -f "$INSTALL_DIR/docker-compose.yml" stop
-    echo -e "${GREEN}Stopped (containers preserved)${NC}"
+    echo -e "${GREEN}Stopped (containers preserved — run 'start' to resume)${NC}"
     ;;
   restart)
     echo -e "${CYAN}Restarting XD-oss-stack...${NC}"
-    $DC -f "$INSTALL_DIR/docker-compose.yml" restart
+    echo ""
+    $DC -f "$INSTALL_DIR/docker-compose.yml" stop
+    start_stack
+    echo ""
     echo -e "${GREEN}Restarted successfully${NC}"
     ;;
   status)
@@ -549,7 +586,13 @@ case "$CMD" in
     ;;
   update)
     echo -e "${CYAN}Pulling latest images...${NC}"
-    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d --pull always
+    $DC -f "$INSTALL_DIR/docker-compose.yml" pull
+    echo ""
+    echo -e "${CYAN}Restarting with new images...${NC}"
+    echo ""
+    $DC -f "$INSTALL_DIR/docker-compose.yml" stop
+    start_stack
+    echo ""
     echo -e "${GREEN}Updated successfully${NC}"
     ;;
   uninstall)
@@ -570,7 +613,7 @@ case "$CMD" in
         sudo rm -rf "$DATA_DIR" 2>/dev/null || rm -rf "$DATA_DIR" 2>/dev/null || true
         echo -e "${GREEN}Data directory removed.${NC}"
     else
-        echo -e "${YELLOW}Data directory kept — you can remove it manually later.${NC}"
+        echo -e "${YELLOW}Data directory kept — remove manually: sudo rm -rf /var/lib/xd-oss-stack${NC}"
     fi
     echo -e "${GREEN}Uninstalled successfully.${NC}"
     ;;
@@ -582,14 +625,14 @@ case "$CMD" in
     echo ""
     echo -e "  ${BOLD}Commands:${NC}"
     echo -e "    ${GREEN}status${NC}              Show container status"
-    echo -e "    ${GREEN}start${NC}               Start all containers"
+    echo -e "    ${GREEN}start${NC}               Start all containers (waits for health)"
     echo -e "    ${GREEN}stop${NC}                Stop all containers (preserves data)"
-    echo -e "    ${GREEN}restart${NC}             Restart all containers"
+    echo -e "    ${GREEN}restart${NC}             Restart all containers (waits for health)"
     echo -e "    ${GREEN}logs [service]${NC}      Follow logs (default: app)"
     echo -e "    ${GREEN}update${NC}              Pull latest images and restart"
     echo -e "    ${GREEN}uninstall${NC}           Remove all containers and data"
     echo ""
-    echo -e "  ${BOLD}Services:${NC} app, otel-collector, doris-fe, doris-be"
+    echo -e "  ${BOLD}Services:${NC} app, collector, fe, be"
     echo ""
     ;;
 esac
