@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Slack Community
+    url: https://xplurdata.slack.com/join/shared_invite/zt-3ztbx9k5e-ZAqInDjoyoICfB2ohq9NsQ#/shared-invite/email
+    about: Ask questions and get help from the community
+  - name: 💼 LinkedIn
+    url: https://www.linkedin.com/company/xplurdata
+    about: Follow us for updates
+  - name: 🔒 Security Vulnerability
+    url: mailto:security@xplurdata.com
+    about: Report security vulnerabilities privately
