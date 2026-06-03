@@ -548,6 +548,19 @@ wait_healthy() {
 start_stack() {
     $DC -f "$INSTALL_DIR/docker-compose.yml" up -d doris-fe
     wait_healthy "otel-doris-fe" "Doris Frontend"
+    # Wait for FE RPC port 9020 — BE uses this Thrift port to connect to FE
+    # 8030 (HTTP) becomes healthy before 9020 (RPC) is ready
+    echo -e "  ${CYAN}⟳${NC}  ${BOLD}$(printf '%-30s' "Doris FE RPC :9020")${NC} ${DIM}waiting...${NC}"
+    local rpc_start=$SECONDS
+    while true; do
+        local rpc_elapsed=$(( SECONDS - rpc_start ))
+        if docker exec otel-doris-fe bash -c "echo > /dev/tcp/localhost/9020" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC}  ${BOLD}$(printf '%-30s' "Doris FE RPC :9020")${NC} ${GREEN}ready${NC} ${DIM}(${rpc_elapsed}s)${NC}"
+            break
+        fi
+        [ $rpc_elapsed -gt 120 ] && echo -e "  ${YELLOW}⚠${NC}  Doris FE RPC timed out — continuing anyway" && break
+        sleep 3
+    done
     $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
     wait_healthy "otel-doris-be" "Doris Backend"
     wait_healthy "otel-app"      "Application"
