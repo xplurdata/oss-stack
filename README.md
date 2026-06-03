@@ -523,10 +523,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 This project is licensed under the **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)**.
 
-- Free to use, modify and deploy
-- Must share modifications under AGPL-3.0
-- If offered as a network service, source code must be available
-- Cannot be sublicensed or sold as proprietary software
+
 
 ---
 
