@@ -368,6 +368,10 @@ ${FE_ENV_BLOCK}
     image: ${REGISTRY}/oss-stack-be:1.0.0
     container_name: otel-doris-be
     entrypoint: ["bash", "/opt/xd/be-entrypoint.sh"]
+    ulimits:
+      nofile:
+        soft: 655350
+        hard: 655350
     networks:
       otel-net:
         ipv4_address: 172.28.0.11
@@ -454,27 +458,20 @@ if [ -d "$STORAGE_HDD/data" ] && [ "$(ls -A $STORAGE_HDD/data 2>/dev/null)" ]; t
 
     # Clean duplicate priority_networks from be.conf
     if [ -f "$BE_HOME/conf/be.conf" ]; then
-        awk '!/priority_networks/{print} /priority_networks/ && !seen[$0]++{print}'             "$BE_HOME/conf/be.conf" > /tmp/be.conf.clean
+        awk '!/priority_networks/{print} /priority_networks/ && !seen[$0]++{print}' \
+            "$BE_HOME/conf/be.conf" > /tmp/be.conf.clean
         cp /tmp/be.conf.clean "$BE_HOME/conf/be.conf"
     fi
 
-    # Start BE in background
-    $BE_HOME/bin/start_be.sh --daemon
+    # Remove stale PID file from previous run
+    rm -f "$BE_HOME/bin/be.pid"
 
-    # Wait for log file to appear
-    for i in $(seq 1 30); do
-        [ -f "$BE_HOME/log/be.INFO" ] && break
-        sleep 1
-    done
+    # Set up environment that entry_point.sh normally handles
+    ulimit -n 655350 2>/dev/null || true
+    swapoff -a 2>/dev/null || true
 
-    # Keep container alive — follow BE log
-    if [ -f "$BE_HOME/log/be.INFO" ]; then
-        echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: BE started — following logs"
-        exec tail -f "$BE_HOME/log/be.INFO"
-    else
-        echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [WARN] [Wrapper]: BE log not found — keeping alive"
-        exec tail -f /dev/null
-    fi
+    # Start BE in foreground — official docs say do NOT use --daemon in Docker
+    exec $BE_HOME/bin/start_be.sh
 else
     echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: First start — running original entry_point.sh"
     exec bash /usr/local/bin/entry_point.sh
