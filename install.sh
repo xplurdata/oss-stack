@@ -222,6 +222,23 @@ else
     [[ "$resp" =~ ^[Yy]$ ]] || error "Aborted."
 fi
 
+# vm.max_map_count — required by Doris BE
+if [[ "$OS" != "macos" ]]; then
+    CURRENT_MAP_COUNT=$(cat /proc/sys/vm/max_map_count 2>/dev/null || echo 0)
+    if [ "$CURRENT_MAP_COUNT" -le 2000000 ]; then
+        warn "vm.max_map_count is ${CURRENT_MAP_COUNT} — Doris BE requires > 2000000"
+        info "Setting vm.max_map_count=2000001..."
+        sudo sysctl -w vm.max_map_count=2000001 >/dev/null 2>&1 || true
+        # Make it permanent
+        if ! grep -q "vm.max_map_count" /etc/sysctl.conf 2>/dev/null; then
+            echo "vm.max_map_count=2000001" | sudo tee -a /etc/sysctl.conf >/dev/null 2>&1 || true
+        fi
+        success "vm.max_map_count set to 2000001 (persisted)"
+    else
+        success "vm.max_map_count: ${CURRENT_MAP_COUNT}"
+    fi
+fi
+
 check_port() {
     local port="$1"
     local required="$2"
@@ -350,6 +367,7 @@ ${FE_ENV_BLOCK}
   doris-be:
     image: ${REGISTRY}/oss-stack-be:1.0.0
     container_name: otel-doris-be
+    entrypoint: ["bash", "/opt/xd/be-entrypoint.sh"]
     networks:
       otel-net:
         ipv4_address: 172.28.0.11
@@ -360,6 +378,7 @@ ${FE_ENV_BLOCK}
       - "9060:9060"
     volumes:
       - ${DATA_DIR}/doris-be:/opt/apache-doris/be/storage.HDD
+      - ${INSTALL_DIR}/be-entrypoint.sh:/opt/xd/be-entrypoint.sh:ro
     environment:
       - FE_SERVERS=fe1:172.28.0.10:9010
       - BE_ADDR=172.28.0.11:9050
@@ -416,6 +435,53 @@ ${FE_ENV_BLOCK}
 COMPOSE
 
 success "docker-compose.yml written"
+
+# Write BE entrypoint wrapper — skips mysql checks on restart
+# Original entry_point.sh uses mysql -uroot which fails after root password is randomized
+# Wrapper detects existing install and starts BE directly
+cat > "$INSTALL_DIR/be-entrypoint.sh" << 'BEWRAP'
+#!/bin/bash
+# Wrapper for Doris BE entry_point.sh
+# On first start: runs original entry_point.sh for registration
+# On restart: starts BE directly — skips mysql checks (root password randomized by app)
+
+DORIS_HOME="/opt/apache-doris"
+BE_HOME="$DORIS_HOME/be"
+STORAGE_HDD="$BE_HOME/storage.HDD"
+
+if [ -d "$STORAGE_HDD/data" ] && [ "$(ls -A $STORAGE_HDD/data 2>/dev/null)" ]; then
+    echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: Existing data found — starting BE directly"
+
+    # Clean duplicate priority_networks from be.conf
+    if [ -f "$BE_HOME/conf/be.conf" ]; then
+        awk '!/priority_networks/{print} /priority_networks/ && !seen[$0]++{print}'             "$BE_HOME/conf/be.conf" > /tmp/be.conf.clean
+        cp /tmp/be.conf.clean "$BE_HOME/conf/be.conf"
+    fi
+
+    # Start BE in background
+    $BE_HOME/bin/start_be.sh --daemon
+
+    # Wait for log file to appear
+    for i in $(seq 1 30); do
+        [ -f "$BE_HOME/log/be.INFO" ] && break
+        sleep 1
+    done
+
+    # Keep container alive — follow BE log
+    if [ -f "$BE_HOME/log/be.INFO" ]; then
+        echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: BE started — following logs"
+        exec tail -f "$BE_HOME/log/be.INFO"
+    else
+        echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [WARN] [Wrapper]: BE log not found — keeping alive"
+        exec tail -f /dev/null
+    fi
+else
+    echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: First start — running original entry_point.sh"
+    exec bash /opt/apache-doris/entry_point.sh
+fi
+BEWRAP
+chmod +x "$INSTALL_DIR/be-entrypoint.sh"
+success "BE entrypoint wrapper written"
 
 if [ -d "$DATA_DIR/doris-fe" ] && [ "$(ls -A "$DATA_DIR/doris-fe" 2>/dev/null)" ]; then
     warn "Existing Doris data found at $DATA_DIR"
