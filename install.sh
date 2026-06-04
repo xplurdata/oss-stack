@@ -466,14 +466,12 @@ if [ -d "$STORAGE_HDD/data" ] && [ "$(ls -A $STORAGE_HDD/data 2>/dev/null)" ]; t
     # Remove stale PID file from previous run
     rm -f "$BE_HOME/bin/be.pid"
 
-    # Copy start_be.sh and remove hard system checks (swap, ulimit, vm.max_map_count)
-    # These checks exit 1 inside Docker where we can't change kernel params
-    # Official workaround: https://github.com/apache/doris/discussions/33638
-    cp "$BE_HOME/bin/start_be.sh" /tmp/start_be_patched.sh
-    sed -i '/exit 1/d' /tmp/start_be_patched.sh
+    # Set up environment that entry_point.sh normally handles
+    ulimit -n 655350 2>/dev/null || true
+    swapoff -a 2>/dev/null || true
 
     # Start BE in foreground — official docs say do NOT use --daemon in Docker
-    exec bash /tmp/start_be_patched.sh
+    exec $BE_HOME/bin/start_be.sh
 else
     echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: First start — running original entry_point.sh"
     exec bash /usr/local/bin/entry_point.sh
