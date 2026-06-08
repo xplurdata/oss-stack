@@ -278,7 +278,10 @@ fi
 echo -e "  Where should Doris store its data? (Survives reinstalls)"
 echo -ne "  ${CYAN}?${NC}  Data directory [${DEFAULT_DATA_DIR}]: "
 read -r DATA_DIR < /dev/tty
-DATA_DIR="${DATA_DIR:-$DEFAULT_DATA_DIR}"
+# Treat y/Y/yes/Yes or empty as "accept default"
+if [ -z "$DATA_DIR" ] || [[ "$DATA_DIR" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    DATA_DIR="$DEFAULT_DATA_DIR"
+fi
 success "Data directory: $DATA_DIR"
 
 mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app" 2>/dev/null || \
@@ -386,6 +389,7 @@ ${FE_ENV_BLOCK}
     environment:
       - FE_SERVERS=fe1:172.28.0.10:9010
       - BE_ADDR=172.28.0.11:9050
+      - SKIP_CHECK_ULIMIT=true
     depends_on:
       doris-fe:
         condition: service_healthy
@@ -466,12 +470,9 @@ if [ -d "$STORAGE_HDD/data" ] && [ "$(ls -A $STORAGE_HDD/data 2>/dev/null)" ]; t
     # Remove stale PID file from previous run
     rm -f "$BE_HOME/bin/be.pid"
 
-    # Set up environment that entry_point.sh normally handles
-    ulimit -n 655350 2>/dev/null || true
-    swapoff -a 2>/dev/null || true
-
-    # Start BE in foreground — official docs say do NOT use --daemon in Docker
-    exec $BE_HOME/bin/start_be.sh
+    # Start BE in foreground (--console)
+    # SKIP_CHECK_ULIMIT=true env var bypasses swap/ulimit/vm.max_map_count checks
+    exec $BE_HOME/bin/start_be.sh --console
 else
     echo "$(date +'%Y-%m-%dT%H:%M:%S%z') [INFO] [Wrapper]: First start — running original entry_point.sh"
     exec bash /usr/local/bin/entry_point.sh
