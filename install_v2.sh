@@ -278,10 +278,7 @@ fi
 echo -e "  Where should Doris store its data? (Survives reinstalls)"
 echo -ne "  ${CYAN}?${NC}  Data directory [${DEFAULT_DATA_DIR}]: "
 read -r DATA_DIR < /dev/tty
-# Treat y/Y/yes/Yes or empty as "accept default"
-if [ -z "$DATA_DIR" ] || [[ "$DATA_DIR" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-    DATA_DIR="$DEFAULT_DATA_DIR"
-fi
+DATA_DIR="${DATA_DIR:-$DEFAULT_DATA_DIR}"
 success "Data directory: $DATA_DIR"
 
 mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app" 2>/dev/null || \
