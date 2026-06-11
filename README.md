@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/XD--oss--stack-v1.0.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
+<img src="https://img.shields.io/badge/XD--oss--stack-v1.0.2-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
 
 <h1>XD-oss-stack</h1>
 
