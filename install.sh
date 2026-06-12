@@ -307,6 +307,26 @@ step "Writing configuration"
 
 if $COMPOSE_CMD -f "$INSTALL_DIR/docker-compose.yml" ps 2>/dev/null | grep -qE "Up|running"; then
     warn "Existing stack detected — cleaning up..."
+    # Migrate DuckDB from named volume BEFORE down -v destroys it
+    if $DOCKER_CMD volume inspect xd-oss-stack_app-duckdb >/dev/null 2>&1; then
+        if [ ! -f "$DATA_DIR/app/app.duckdb" ]; then
+            info "Migrating app data from Docker volume to $DATA_DIR/app..."
+            mkdir -p "$DATA_DIR/app" 2>/dev/null || sudo mkdir -p "$DATA_DIR/app"
+            chmod 777 "$DATA_DIR/app" 2>/dev/null || sudo chmod 777 "$DATA_DIR/app"
+            # Use temp Alpine container — works on Linux, macOS, WSL
+            $DOCKER_CMD run --rm \
+                -v xd-oss-stack_app-duckdb:/source:ro \
+                -v "$DATA_DIR/app":/dest \
+                alpine sh -c "cp -a /source/. /dest/" 2>/dev/null
+            if [ -f "$DATA_DIR/app/app.duckdb" ]; then
+                success "App data migrated to $DATA_DIR/app"
+            else
+                warn "App data migration failed — app will create fresh database"
+            fi
+        else
+            info "App data already at $DATA_DIR/app — skipping migration"
+        fi
+    fi
     $COMPOSE_CMD -f "$INSTALL_DIR/docker-compose.yml" down -v 2>/dev/null || true
     success "Existing stack removed"
 fi
@@ -338,9 +358,6 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
-
-volumes:
-  app-duckdb:
 
 services:
   doris-fe:
@@ -404,7 +421,7 @@ ${FE_ENV_BLOCK}
     cpus: '1.5'
 
   app:
-    image: ${REGISTRY}/oss-stack-app:1.0.0
+    image: ${REGISTRY}/oss-stack-app:1.0.2
     container_name: otel-app
     networks:
       otel-net:
@@ -412,7 +429,7 @@ ${FE_ENV_BLOCK}
     ports:
       - "80:80"
     volumes:
-      - app-duckdb:/data
+      - ${DATA_DIR}/app:/data
     depends_on:
       - doris-be
     healthcheck:
@@ -487,11 +504,13 @@ if [ -d "$DATA_DIR/doris-fe" ] && [ "$(ls -A "$DATA_DIR/doris-fe" 2>/dev/null)" 
     read -r clean_resp < /dev/tty
     clean_resp="${clean_resp:-Y}"
     if [[ "$clean_resp" =~ ^[Yy]$ ]]; then
-        rm -rf "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" 2>/dev/null || \
-            sudo rm -rf "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be"
-        mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" 2>/dev/null || \
-            sudo mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be"
+        rm -rf "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app" 2>/dev/null || \
+            sudo rm -rf "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app"
+        mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app" 2>/dev/null || \
+            sudo mkdir -p "$DATA_DIR/doris-fe" "$DATA_DIR/doris-be" "$DATA_DIR/app"
         chmod -R 777 "$DATA_DIR" 2>/dev/null || sudo chmod -R 777 "$DATA_DIR"
+        # Clean old named volume if it exists
+        $DOCKER_CMD volume rm xd-oss-stack_app-duckdb 2>/dev/null || true
         success "Data directories cleaned"
     else
         warn "Keeping existing data"
@@ -506,7 +525,7 @@ echo ""
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-fe:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-be:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-collector:1.0.0" &&
-    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:1.0.0"
+    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:1.0.2"
 ) > /tmp/xd-pull.log 2>&1 &
 
 PULL_PID=$!
@@ -662,15 +681,85 @@ case "$CMD" in
     $DC -f "$INSTALL_DIR/docker-compose.yml" logs -f "$SVC"
     ;;
   update)
-    echo -e "${CYAN}Pulling latest images...${NC}"
+    # Self-update manage.sh and be-entrypoint.sh from GitHub before doing anything
+    if [ "${_MANAGE_UPDATED:-}" != "1" ]; then
+        echo -e "${CYAN}Checking for updates...${NC}"
+        LATEST_INSTALLER=$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh 2>/dev/null)
+        if [ -n "$LATEST_INSTALLER" ]; then
+            # Extract and update manage.sh
+            NEW_MANAGE=$(echo "$LATEST_INSTALLER" | sed -n "/^cat > \"\$INSTALL_DIR\/manage.sh\" << 'MANAGE'$/,/^MANAGE$/p" | tail -n +2 | head -n -1)
+            if [ -n "$NEW_MANAGE" ]; then
+                echo "$NEW_MANAGE" > "$INSTALL_DIR/manage.sh"
+                chmod +x "$INSTALL_DIR/manage.sh"
+            fi
+            # Extract and update be-entrypoint.sh
+            NEW_WRAPPER=$(echo "$LATEST_INSTALLER" | sed -n "/^cat > \"\$INSTALL_DIR\/be-entrypoint.sh\" << 'BEWRAP'$/,/^BEWRAP$/p" | tail -n +2 | head -n -1)
+            if [ -n "$NEW_WRAPPER" ]; then
+                echo "$NEW_WRAPPER" > "$INSTALL_DIR/be-entrypoint.sh"
+                chmod +x "$INSTALL_DIR/be-entrypoint.sh"
+            fi
+            # Re-exec with updated manage.sh
+            _MANAGE_UPDATED=1 exec "$INSTALL_DIR/manage.sh" update
+        fi
+    fi
+    echo -e "${CYAN}Checking for updates...${NC}"
+    echo ""
+    # Download latest install.sh from GitHub to get current image versions
+    LATEST_INSTALLER=$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh 2>/dev/null)
+    if [ -z "$LATEST_INSTALLER" ]; then
+        echo -e "${RED}Failed to fetch latest version info from GitHub${NC}"
+        echo -e "${CYAN}Falling back to pulling current images...${NC}"
+        $DC -f "$INSTALL_DIR/docker-compose.yml" pull
+        $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
+        echo -e "${GREEN}Updated successfully${NC}"
+        exit 0
+    fi
+    # Extract latest image versions
+    NEW_FE=$(echo "$LATEST_INSTALLER" | grep "oss-stack-fe:" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    NEW_BE=$(echo "$LATEST_INSTALLER" | grep "oss-stack-be:" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    NEW_APP=$(echo "$LATEST_INSTALLER" | grep "oss-stack-app:" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    NEW_COL=$(echo "$LATEST_INSTALLER" | grep "oss-stack-collector:" | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    # Extract current versions from docker-compose.yml
+    CUR_FE=$(grep "oss-stack-fe:" "$INSTALL_DIR/docker-compose.yml" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    CUR_BE=$(grep "oss-stack-be:" "$INSTALL_DIR/docker-compose.yml" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    CUR_APP=$(grep "oss-stack-app:" "$INSTALL_DIR/docker-compose.yml" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    CUR_COL=$(grep "oss-stack-collector:" "$INSTALL_DIR/docker-compose.yml" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    # Show comparison
+    HAS_UPDATE=false
+    echo -e "  ${BOLD}Image versions:${NC}"
+    for img in fe be app collector; do
+        eval cur=\$CUR_$(echo $img | tr '[:lower:]' '[:upper:]' | sed 's/COLLECTOR/COL/')
+        eval new=\$NEW_$(echo $img | tr '[:lower:]' '[:upper:]' | sed 's/COLLECTOR/COL/')
+        if [ -z "$new" ]; then new="$cur"; fi
+        if [ "$cur" != "$new" ]; then
+            echo -e "  ${GREEN}│${NC}  oss-stack-${img}  ${DIM}${cur}${NC} → ${GREEN}${new}${NC}  ${GREEN}(update)${NC}"
+            HAS_UPDATE=true
+        else
+            echo -e "  ${GREEN}│${NC}  oss-stack-${img}  ${DIM}${cur}${NC} → ${DIM}${new}${NC}  ${DIM}(no change)${NC}"
+        fi
+    done
+    echo ""
+    if [ "$HAS_UPDATE" = "false" ]; then
+        echo -e "${GREEN}Already up to date${NC}"
+        exit 0
+    fi
+    echo -ne "${CYAN}?${NC}  Apply updates? ${BOLD}[Y/n]${NC}: "
+    read -r update_resp
+    update_resp="${update_resp:-Y}"
+    [[ "$update_resp" =~ ^[Yy]$ ]] || exit 0
+    # Update docker-compose.yml with new versions
+    [ -n "$NEW_FE" ] && sed -i "s|oss-stack-fe:${CUR_FE}|oss-stack-fe:${NEW_FE}|g" "$INSTALL_DIR/docker-compose.yml"
+    [ -n "$NEW_BE" ] && sed -i "s|oss-stack-be:${CUR_BE}|oss-stack-be:${NEW_BE}|g" "$INSTALL_DIR/docker-compose.yml"
+    [ -n "$NEW_APP" ] && sed -i "s|oss-stack-app:${CUR_APP}|oss-stack-app:${NEW_APP}|g" "$INSTALL_DIR/docker-compose.yml"
+    [ -n "$NEW_COL" ] && sed -i "s|oss-stack-collector:${CUR_COL}|oss-stack-collector:${NEW_COL}|g" "$INSTALL_DIR/docker-compose.yml"
+    echo ""
+    echo -e "${CYAN}Pulling updated images...${NC}"
     $DC -f "$INSTALL_DIR/docker-compose.yml" pull
     echo ""
-    echo -e "${CYAN}Restarting with new images...${NC}"
+    echo -e "${CYAN}Applying updates...${NC}"
+    $DC -f "$INSTALL_DIR/docker-compose.yml" up -d
     echo ""
-    $DC -f "$INSTALL_DIR/docker-compose.yml" stop
-    start_stack
-    echo ""
-    echo -e "${GREEN}Updated successfully${NC}"
+    echo -e "${GREEN}Updated to latest version${NC}"
     ;;
   uninstall)
     echo -e "${RED}This will remove all containers, volumes and the install directory.${NC}"
