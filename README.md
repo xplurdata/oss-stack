@@ -100,6 +100,7 @@ flowchart LR
 | OS | Ubuntu 20.04+ / macOS 12+ | Ubuntu 22.04 |
 
 > **Low RAM?** The installer automatically detects available memory and applies reduced JVM settings for machines with less than 8 GB RAM.
+> **Note** Apache Doris BE requires AVX2 processor support. Some virtualization platforms (e.g. ProxMox) may not expose AVX2 instructions to guest VMs — Doris BE will fail to start on these environments.
 
 ---
 
