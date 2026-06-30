@@ -22,7 +22,7 @@ jobs:
           - name: oss-stack-be
             full: ghcr.io/xplurdata/oss-stack-be:1.0.0
           - name: oss-stack-app
-            full: ghcr.io/xplurdata/oss-stack-app:1.0.0
+            full: ghcr.io/xplurdata/oss-stack-app:1.1.0
           - name: oss-stack-collector
             full: ghcr.io/xplurdata/oss-stack-collector:1.0.0
 
