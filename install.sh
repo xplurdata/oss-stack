@@ -8,7 +8,7 @@ set -e
 
 REGISTRY="ghcr.io/xplurdata"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/xd-oss-stack}"
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 # ── Colors ────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -421,7 +421,7 @@ ${FE_ENV_BLOCK}
     cpus: '1.5'
 
   app:
-    image: ${REGISTRY}/oss-stack-app:1.0.2
+    image: ${REGISTRY}/oss-stack-app:1.1.0
     container_name: otel-app
     networks:
       otel-net:
@@ -525,7 +525,7 @@ echo ""
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-fe:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-be:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-collector:1.0.0" &&
-    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:1.0.2"
+    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:1.1.0"
 ) > /tmp/xd-pull.log 2>&1 &
 
 PULL_PID=$!

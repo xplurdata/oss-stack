@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/XD--oss--stack-v1.0.2-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
+<img src="https://img.shields.io/badge/XD--oss--stack-v1.1.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
 
 <h1>XD-oss-stack</h1>
 
@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/License-AGPL%20v3-blue?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/version-1.0.2-brightgreen?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.0-brightgreen?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/Docker-required-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Apache%20Doris-4.0.4-1C64F2?style=flat-square" alt="Apache Doris">
   <img src="https://img.shields.io/badge/OTel%20Collector-0.149.0-6e4aff?style=flat-square" alt="OTel Collector">
@@ -100,8 +100,6 @@ flowchart LR
 | OS | Ubuntu 20.04+ / macOS 12+ | Ubuntu 22.04 |
 
 > **Low RAM?** The installer automatically detects available memory and applies reduced JVM settings for machines with less than 8 GB RAM.
-> 
-> **Note** Apache Doris BE requires AVX2 processor support. Some virtualization platforms (e.g. ProxMox) may not expose AVX2 instructions to guest VMs — Doris BE will fail to start on these environments.
 
 ---
 
@@ -124,7 +122,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 ```
   ╔═══════════════════════════════════════════════════════╗
-  ║          XD-oss-stack Installer v1.0.0               ║
+  ║          XD-oss-stack Installer v1.1.0               ║
   ╚═══════════════════════════════════════════════════════╝
 
   ▶  Checking system requirements
@@ -415,7 +413,7 @@ let provider = LoggerProvider::builder()
 
 ## Upgrade
 
-### Recommended — re-run the installer:
+To upgrade to the latest version, re-run the installer:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main/install.sh)"
@@ -425,7 +423,7 @@ When prompted **"Clean existing data for fresh install?"** — select **`n`** to
 
 <img src="docs/upgrade-keep-data.png" alt="Select n to keep existing data" width="700"/>
 
-> **Important:** Selecting `n` preserves all your Doris data (logs, traces, metrics) and app data (user accounts, settings). The installer will migrate data to the new location if needed.
+> **Important:** Selecting `n` preserves all your Doris data (logs, traces, metrics) and app data (user accounts, settings). The installer will automatically migrate data if needed.
 
 ---
 
