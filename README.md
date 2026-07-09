@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/XD--oss--stack-v1.1.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
+<img src="https://img.shields.io/badge/XD--oss--stack-v2.0.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
 
 <h1>XD-oss-stack</h1>
 
@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/License-AGPL%20v3-blue?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/version-1.1.0-brightgreen?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.0-brightgreen?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/Docker-required-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Apache%20Doris-4.0.4-1C64F2?style=flat-square" alt="Apache Doris">
   <img src="https://img.shields.io/badge/OTel%20Collector-0.149.0-6e4aff?style=flat-square" alt="OTel Collector">
@@ -122,7 +122,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 ```
   ╔═══════════════════════════════════════════════════════╗
-  ║          XD-oss-stack Installer v1.1.0               ║
+  ║          XD-oss-stack Installer v2.0.0               ║
   ╚═══════════════════════════════════════════════════════╝
 
   ▶  Checking system requirements
