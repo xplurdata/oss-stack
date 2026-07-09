@@ -122,7 +122,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 ```
   ╔═══════════════════════════════════════════════════════╗
-  ║          XD-oss-stack Installer v2.0.0               ║
+  ║          XD-oss-stack Installer v2.0.0                ║
   ╚═══════════════════════════════════════════════════════╝
 
   ▶  Checking system requirements
@@ -144,8 +144,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
   ✓  OTel Collector         running
 
   ╔═══════════════════════════════════════════════════════╗
-  ║   ✓  Installation Complete!                          ║
-  ║      Happy Xpluring your data!                       ║
+  ║   ✓  Installation Complete!                           ║
+  ║      Happy Xpluring your data!                        ║
   ╚═══════════════════════════════════════════════════════╝
 ```
 
