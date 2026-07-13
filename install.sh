@@ -8,7 +8,7 @@ set -e
 
 REGISTRY="ghcr.io/xplurdata"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/xd-oss-stack}"
-VERSION="2.0.0"
+VERSION="1.0.0"
 
 # ── Colors ────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -340,15 +340,23 @@ done
 
 mkdir -p "$INSTALL_DIR" 2>/dev/null || sudo mkdir -p "$INSTALL_DIR"
 
+# WSL requires -XX:-UseContainerSupport to prevent cgroup v2 NullPointerException in BerkeleyDB
+WSL_JDK_OPTS=""
+if [[ "$OS" == "wsl" ]]; then
+    WSL_JDK_OPTS="      - JDK_JAVA_OPTIONS=-XX:-UseContainerSupport"
+fi
+
 if [ -n "$FE_JVM_OPTS" ]; then
     FE_ENV_BLOCK="    environment:
       - FE_SERVERS=fe1:172.28.0.10:9010
       - FE_ID=1
-      - JAVA_OPTS_FOR_JDK_17=${FE_JVM_OPTS}"
+      - JAVA_OPTS_FOR_JDK_17=${FE_JVM_OPTS}${WSL_JDK_OPTS:+
+${WSL_JDK_OPTS}}"
 else
     FE_ENV_BLOCK="    environment:
       - FE_SERVERS=fe1:172.28.0.10:9010
-      - FE_ID=1"
+      - FE_ID=1${WSL_JDK_OPTS:+
+${WSL_JDK_OPTS}}"
 fi
 
 cat > "$INSTALL_DIR/docker-compose.yml" << COMPOSE
@@ -421,7 +429,7 @@ ${FE_ENV_BLOCK}
     cpus: '1.5'
 
   app:
-    image: ${REGISTRY}/oss-stack-app:2.0.0
+    image: ${REGISTRY}/oss-stack-app:1.1.0
     container_name: otel-app
     networks:
       otel-net:
@@ -443,7 +451,7 @@ ${FE_ENV_BLOCK}
     cpus: '0.5'
 
   otel-collector:
-    image: ${REGISTRY}/oss-stack-collector:2.0.0
+    image: ${REGISTRY}/oss-stack-collector:1.0.0
     container_name: otel-collector
     networks:
       otel-net:
@@ -524,8 +532,8 @@ echo ""
 (
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-fe:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-be:1.0.0" &&
-    $DOCKER_CMD pull "${REGISTRY}/oss-stack-collector:2.0.0" &&
-    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:2.0.0"
+    $DOCKER_CMD pull "${REGISTRY}/oss-stack-collector:1.0.0" &&
+    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:1.1.0"
 ) > /tmp/xd-pull.log 2>&1 &
 
 PULL_PID=$!
