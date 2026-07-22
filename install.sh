@@ -40,18 +40,18 @@ error()   { echo -e "\n  ${RED}✗${NC}  $1"; exit 1; }
 # ── Banner ────────────────────────────────────────────────────
 print_banner() {
     echo ""
-    echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
+    echo -e "${BOLD}${CYAN}  ╔═════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}██╗  ██╗██████╗      ██████╗ ███████╗███████╗${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}╚██╗██╔╝██╔══██╗    ██╔═══██╗██╔════╝██╔════╝${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE} ╚███╔╝ ██║  ██║    ██║   ██║███████╗███████╗${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE} ██╔██╗ ██║  ██║    ██║   ██║╚════██║╚════██║${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}██╔╝ ██╗██████╔╝    ╚██████╔╝███████║███████║${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}╚═╝  ╚═╝╚═════╝      ╚═════╝ ╚══════╝╚══════╝${CYAN}      ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║        ${WHITE}Observability Stack Installer v${VERSION}${CYAN}         ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
-    echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║        ${WHITE}Observability Stack Installer v${VERSION}${CYAN}     ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
+    echo -e "${BOLD}${CYAN}  ╚═════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
 
