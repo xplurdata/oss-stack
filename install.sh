@@ -306,7 +306,7 @@ confirm="${confirm:-Y}"
 step "Writing configuration"
 
 if $COMPOSE_CMD -f "$INSTALL_DIR/docker-compose.yml" ps 2>/dev/null | grep -qE "Up|running"; then
-    warn "Existing stack detected — cleaning up..."
+    warn "Existing stack detected — Investigating..."
     # Migrate DuckDB from named volume BEFORE down -v destroys it
     if $DOCKER_CMD volume inspect xd-oss-stack_app-duckdb >/dev/null 2>&1; then
         if [ ! -f "$DATA_DIR/app/app.duckdb" ]; then
