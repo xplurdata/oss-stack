@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/XD--oss--stack-v2.0.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
+<img src="https://img.shields.io/badge/XD--oss--stack-v3.0.0-6e4aff?style=for-the-badge&labelColor=0d1117" alt="Version">
 
 <h1>XD-oss-stack</h1>
 
@@ -8,7 +8,7 @@
 
 <p>
   <img src="https://img.shields.io/badge/License-AGPL%20v3-blue?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.0-brightgreen?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.0.0-brightgreen?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/Docker-required-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Apache%20Doris-4.0.4-1C64F2?style=flat-square" alt="Apache Doris">
   <img src="https://img.shields.io/badge/OTel%20Collector-0.149.0-6e4aff?style=flat-square" alt="OTel Collector">
@@ -84,8 +84,8 @@ flowchart LR
 
 | Database | Tables | Purpose |
 |----------|--------|---------|
-| `otel_db` | `otel_logs`, `otel_traces`, `otel_metrics` | Live telemetry from OTel Collector |
-| `demo_otel_db` | `otel_logs` | Pre-seeded demo data (10,000 records) |
+| `otel_db` | `otel_logs`, `otel_traces`, `otel_metrics_*` | Live telemetry from OTel Collector |
+| `demo_otel_db` | `otel_logs`, `otel_traces`, `otel_metrics_*` | Pre-seeded demo data (5,100 records) |
 
 ---
 
@@ -122,7 +122,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/xplurdata/oss-stack/main
 
 ```
   ╔═══════════════════════════════════════════════════════╗
-  ║          XD-oss-stack Installer v2.0.0                ║
+  ║          XD-oss-stack Installer v1.0.0                ║
   ╚═══════════════════════════════════════════════════════╝
 
   ▶  Checking system requirements
@@ -429,15 +429,30 @@ When prompted **"Clean existing data for fresh install?"** — select **`n`** to
 
 ## Demo Data
 
-On first boot the stack seeds **10,000 realistic log records** across 5 microservices so you can explore immediately:
+On first boot the stack seeds realistic logs, traces, and metrics across the same 5 microservices so you can explore every page immediately — no ingest required.
+
+| Signal | Records seeded | Notes |
+|--------|-----------------|-------|
+| **Logs** | ~3,000 | evenly split across 5 services; ~60% carry a `trace_id`/`span_id` for log↔trace correlation — see breakdown below |
+| **Traces** | ~1,000 traces, ~2,500 spans | Linear call chains across 7 request flows (e.g. `POST /v1/checkout` → api-gateway → auth-service → payment-service → notification-service); ~8% error-injected |
+| **Metrics** | ~4,100 data points | All 6 OTel instrument types — Gauge, Counter, UpDownCounter, Histogram, ExponentialHistogram, Summary — with per-metric attribute vocabularies so cardinality varies realistically |
+
+### Logs — service & severity breakdown
+
+Each of the 5 services gets an even share of the ~3,000 log records, and every service uses the same severity mix:
 
 | Service | Records | Severity |
-|---------|---------|---------|
-| api-gateway | ~2,000 | 70% INFO · 15% WARN · 15% ERROR |
-| auth-service | ~2,000 | 70% INFO · 15% WARN · 15% ERROR |
-| payment-service | ~2,000 | 70% INFO · 15% WARN · 15% ERROR |
-| notification-service | ~2,000 | 70% INFO · 15% WARN · 15% ERROR |
-| inventory-service | ~2,000 | 70% INFO · 15% WARN · 15% ERROR |
+|---------|---------|----------|
+| `api-gateway` | ~600 | 70% INFO · 15% WARN · 10% ERROR · 5% DEBUG |
+| `auth-service` | ~600 | 70% INFO · 15% WARN · 10% ERROR · 5% DEBUG |
+| `payment-service` | ~600 | 70% INFO · 15% WARN · 10% ERROR · 5% DEBUG |
+| `notification-service` | ~600 | 70% INFO · 15% WARN · 10% ERROR · 5% DEBUG |
+| `inventory-service` | ~600 | 70% INFO · 15% WARN · 10% ERROR · 5% DEBUG |
+
+Each service also has its own realistic log message templates (e.g. `payment-service` emits `Payment declined order_id=... insufficient funds`, `auth-service` emits `Invalid token for user
+...`), plus matching span operations and metric attributes (HTTP routes, DB tables, payment providers, etc) so the same 5 services tie together across Logs, Traces, and Metrics.
+
+
 
 ---
 
