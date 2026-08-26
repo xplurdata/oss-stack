@@ -8,7 +8,7 @@ set -e
 
 REGISTRY="ghcr.io/xplurdata"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/xd-oss-stack}"
-VERSION="3.0.0"
+VERSION="1.0.0"
 
 # ── Colors ────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -40,18 +40,18 @@ error()   { echo -e "\n  ${RED}✗${NC}  $1"; exit 1; }
 # ── Banner ────────────────────────────────────────────────────
 print_banner() {
     echo ""
-    echo -e "${BOLD}${CYAN}  ╔═════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
+    echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}██╗  ██╗██████╗      ██████╗ ███████╗███████╗${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}╚██╗██╔╝██╔══██╗    ██╔═══██╗██╔════╝██╔════╝${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE} ╚███╔╝ ██║  ██║    ██║   ██║███████╗███████╗${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE} ██╔██╗ ██║  ██║    ██║   ██║╚════██║╚════██║${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}██╔╝ ██╗██████╔╝    ╚██████╔╝███████║███████║${CYAN}      ║${NC}"
     echo -e "${BOLD}${CYAN}  ║   ${WHITE}╚═╝  ╚═╝╚═════╝      ╚═════╝ ╚══════╝╚══════╝${CYAN}      ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║        ${WHITE}Observability Stack Installer v${VERSION}${CYAN}     ║${NC}"
-    echo -e "${BOLD}${CYAN}  ║                                                                     ║${NC}"
-    echo -e "${BOLD}${CYAN}  ╚═════════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║        ${WHITE}Observability Stack Installer v${VERSION}${CYAN}         ║${NC}"
+    echo -e "${BOLD}${CYAN}  ║                                                       ║${NC}"
+    echo -e "${BOLD}${CYAN}  ╚═══════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
 
@@ -306,7 +306,7 @@ confirm="${confirm:-Y}"
 step "Writing configuration"
 
 if $COMPOSE_CMD -f "$INSTALL_DIR/docker-compose.yml" ps 2>/dev/null | grep -qE "Up|running"; then
-    warn "Existing stack detected — Investigating..."
+    warn "Existing stack detected — cleaning up..."
     # Migrate DuckDB from named volume BEFORE down -v destroys it
     if $DOCKER_CMD volume inspect xd-oss-stack_app-duckdb >/dev/null 2>&1; then
         if [ ! -f "$DATA_DIR/app/app.duckdb" ]; then
@@ -429,7 +429,7 @@ ${FE_ENV_BLOCK}
     cpus: '1.5'
 
   app:
-    image: ${REGISTRY}/oss-stack-app:3.0.0
+    image: ${REGISTRY}/oss-stack-app:3.0.1
     container_name: otel-app
     networks:
       otel-net:
@@ -533,7 +533,7 @@ echo ""
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-fe:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-be:1.0.0" &&
     $DOCKER_CMD pull "${REGISTRY}/oss-stack-collector:3.0.0" &&
-    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:3.0.0"
+    $DOCKER_CMD pull "${REGISTRY}/oss-stack-app:3.0.1"
 ) > /tmp/xd-pull.log 2>&1 &
 
 PULL_PID=$!
