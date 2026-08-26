@@ -24,7 +24,7 @@ jobs:
           - name: oss-stack-app
             full: ghcr.io/xplurdata/oss-stack-app:3.0.1
           - name: oss-stack-collector
-            full: ghcr.io/xplurdata/oss-stack-collector:2.0.0
+            full: ghcr.io/xplurdata/oss-stack-collector:3.0.0
 
     steps:
       - name: Checkout
